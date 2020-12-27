@@ -1,4 +1,5 @@
 import os
+import gc
 import sys
 import tempfile
 
@@ -9,14 +10,19 @@ import matplotlib.pyplot as plt
 from utils.tracker_with_masks import centroid_multi_tracker
 from utils import visualisation_utils as vis_util
 
-DEFAULT_VIDEO_LABELS_PATH = './data/labels48.npz'
+DEFAULT_VIDEO_LABELS_PATH = './data/videos/labels.npz'
+DEFAULT_IMAGES_LABELS_PATH = './data/images/predictions.npz'
 
 
 class CellDetector:
     def __init__(self):
         self.tracker = centroid_multi_tracker
         self.category_index = {'name': 'cell', 'id': 0}
-        self.prelabeled = np.load(DEFAULT_VIDEO_LABELS_PATH, allow_pickle=True)['a']
+        self.prelabeled_videos = np.load(
+            DEFAULT_VIDEO_LABELS_PATH, allow_pickle=True)
+        self.prelabeled_images = np.load(
+            DEFAULT_IMAGES_LABELS_PATH,
+            allow_pickle=True)['a']
 
     def predict_image(self, image, default_idx=None):
         """
@@ -31,9 +37,7 @@ class CellDetector:
             return image, [], [], []
 
         image = image.copy()
-        boxes = self.prelabeled[0][0][default_idx]
-        scores = self.prelabeled[0][1][default_idx]
-        masks = self.prelabeled[0][2][default_idx]
+        boxes, scores, masks = self.prelabeled_images[default_idx]
         classes = [0 for _ in range(len(boxes))]
         track_ids = list(range(len(boxes)))
 
@@ -59,6 +63,9 @@ class CellDetector:
         return image, boxes, scores, masks
 
     def predict_video(self, video_path):
+        video_name = video_path.split('/')[-1].strip('.webm')
+        video_prediction = self.prelabeled_videos[video_name]
+
         video = cv2.VideoCapture(video_path)
         size = (int(video.get(3)), int(video.get(4)))
         mot_tracker = self.tracker(maxLost=4, max_jump=150, size=size)
@@ -69,7 +76,11 @@ class CellDetector:
             ok, frame = video.read()
             if not ok:
                 break
-            _, boxes, scores, masks = self.predict_image(frame, i)
+            boxes, scores, masks = video_prediction[:, i]
+
+            size = frame.shape[1::-1]
+            if len(boxes) > 0:
+                boxes = boxes / [size[1], size[0], size[1], size[0]]
 
             tracked_objects = mot_tracker.update(boxes, masks, scores)
 
@@ -103,7 +114,9 @@ class CellDetector:
                 track_ids,
             ])
             i += 1
+            gc.collect()
         video.release()
+        gc.collect()
         return predictions
 
 

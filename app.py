@@ -10,8 +10,11 @@ from utils.predictor import (
     CellDetector, get_track, write_video, plot_trajectories_plot
 )
 
-
-DEFAULT_VIDEO_FILEPATH = 'data/Well_A2_25_48_2.webm'
+DEFAULT_VIDEO_FILEPATHES = [
+    'data/videos/Well_A1_05.webm',
+    'data/videos/Well_A1_08.webm',
+    'data/videos/Well_A2_25.webm',
+]
 
 FAQ = """
 Вам представляется демонстрация детектора одного из типов стволовых
@@ -65,7 +68,7 @@ def process_image():
     st.write("""## You can load image or select pictures from example """)
     option = st.radio(
         '',
-        ('image 1', 'image 2', 'image 3', 'load image'),
+        [f'image {i + 1}' for i in range(10)] + ['load image'],
     )
     image = None
     if option == 'load image':
@@ -78,8 +81,8 @@ def process_image():
             st.warning('Load image')
             st.stop()
     else:
-        idx = int(option[-1]) * 15 + 2
-        image_path = f'data/frames/image_{idx:02}.jpg'
+        idx = int(option[-1]) - 1 if int(option[-1]) != 0 else 9
+        image_path = f'data/images/other_{idx}.jpg'
         image = Image.open(image_path)
 
     try:
@@ -89,7 +92,7 @@ def process_image():
             st.image(image, use_column_width=True)
 
             st.header("Predictions")
-            idx = int(image_path.split('.')[-2][-2:])
+            idx = int(image_path.split('.')[-2][-1])
             image_prediction = detector.predict_image(image, idx)
             predicted_image = image_prediction[0]
             st.image(predicted_image, use_column_width=True)
@@ -111,22 +114,15 @@ def process_image():
         else:
             st.warning('Load image')
     except BaseException:
-        # st.warning(e)
         st.warning('Load another image or refresh page')
         st.stop()
-
-
-@st.cache
-def get_predicted_video(video_path):
-    """for caching"""
-    return detector.predict_video(video_path)
 
 
 def process_video():
     st.write("""## You can load video or select default one """)
     option = st.radio(
-        "Actually it works only with default video (you can load it manually :D)",
-        ('default video', 'load video'),
+        '',
+        [f'video {i + 1}' for i in range(3)] + ['load video'],
     )
     if option == 'load video':
         uploaded_file = st.file_uploader(
@@ -138,16 +134,20 @@ def process_video():
         video_path = get_filepath_of_loaded_file(uploaded_file)
 
     else:
-        video_path = DEFAULT_VIDEO_FILEPATH
+        video_idx = int(option[-1]) - 1
+        video_path = DEFAULT_VIDEO_FILEPATHES[video_idx]
 
     with open(video_path, 'rb') as video_file:
         video_bytes = video_file.read()
         st.header("Source video")
         st.video(video_bytes)
-
+    
+    st.markdown('### Cells are crawling the medium on plate. We must count them...')
+    if not st.button("Start prediction!"):
+        st.stop()
     try:
-        # video_prediction = detector.predict_video(video_path)
-        video_prediction = get_predicted_video(video_path)
+        st.text('Patience you must have')
+        video_prediction = detector.predict_video(video_path)
         predicted_video_path = write_video(video_prediction)
         tracks = get_track(video_prediction)
     except BaseException:
@@ -164,9 +164,10 @@ def process_video():
     _cell_square_means = []
     _cell_square_stds = []
     for pred in video_prediction:
-        masks = pred[3]
-        _cell_square_means.append(masks.sum(axis=(1, 2)).mean())
-        _cell_square_stds.append(masks.sum(axis=(1, 2)).std())
+        if len(pred[1]) > 0:
+            masks = pred[3]
+            _cell_square_means.append(masks.sum(axis=(1, 2)).mean())
+            _cell_square_stds.append(masks.sum(axis=(1, 2)).std())
 
     cell_square_mean = np.mean(_cell_square_means)
     cell_square_std = np.mean(_cell_square_stds)
@@ -182,9 +183,8 @@ def process_video():
     st.pyplot(fig)
     expander = st.beta_expander("Centered plot FAQ")
     expander.markdown("""
-    Трек от каждой клетки пускаем из (0, 0) и смотрим куда направлен
-    тренд движения. Здесь видно, что четкого направления нет, однако
-    это лишь траектории клеток за примерно 4 суток, а это мало
+    Трек от каждой клетки пускаем из (0, 0) и смотрим, куда направлен
+    тренд движения клеток в среднем
     """)
 
 

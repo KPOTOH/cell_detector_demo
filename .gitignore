@@ -4,6 +4,6 @@ minimal_env
 __pycache__
 stuff
 utils/__pycache__
-data/labels48.npy
+data/*.zip
 .ipynb_checkpoints
 
