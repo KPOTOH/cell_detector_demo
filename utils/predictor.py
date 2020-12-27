@@ -9,16 +9,14 @@ import matplotlib.pyplot as plt
 from utils.tracker_with_masks import centroid_multi_tracker
 from utils import visualisation_utils as vis_util
 
-DEFAULT_VIDEO_FILEPATH = './data/Well_A2_25_48.avi'
-DEFAULT_VIDEO_LABELS_PATH = './data/labels48.npy'
+DEFAULT_VIDEO_LABELS_PATH = './data/labels48.npz'
 
 
 class CellDetector:
     def __init__(self):
         self.tracker = centroid_multi_tracker
         self.category_index = {'name': 'cell', 'id': 0}
-        self.prelabeled = np.load(DEFAULT_VIDEO_LABELS_PATH,
-                                  allow_pickle=True)
+        self.prelabeled = np.load(DEFAULT_VIDEO_LABELS_PATH, allow_pickle=True)['a']
 
     def predict_image(self, image, default_idx=None):
         """
@@ -60,7 +58,7 @@ class CellDetector:
         )
         return image, boxes, scores, masks
 
-    def predict_video(self, video_path=DEFAULT_VIDEO_FILEPATH):
+    def predict_video(self, video_path):
         video = cv2.VideoCapture(video_path)
         size = (int(video.get(3)), int(video.get(4)))
         mot_tracker = self.tracker(maxLost=4, max_jump=150, size=size)
