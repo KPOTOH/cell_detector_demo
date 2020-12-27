@@ -6,4 +6,5 @@ stuff
 utils/__pycache__
 data/*.zip
 .ipynb_checkpoints
-
+.vscode
+.gitignore
